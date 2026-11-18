@@ -1,0 +1,48 @@
+x-django: &django
+  build: .
+  environment:
+    - POSTGRES_HOST=db
+    - REDIS_URL=redis://redis:6379/0
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_started
+
+services:
+  web:
+    <<: *django
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+
+  worker:
+    <<: *django
+    command: celery -A celeryapp worker -l info
+
+  beat:
+    <<: *django
+    command: celery -A celeryapp beat -l info
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=appdb
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppass
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  redis-data:
+  pg-data:
