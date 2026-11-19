@@ -1,0 +1,40 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8080:3000"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=dev
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppass
+      - REDIS_HOST=redis
+    command: sh -c "npm run task migrate latest && npm run server"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=dev
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppass
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+
+volumes:
+  pg-data:
+  redis-data:
